@@ -1,8 +1,10 @@
 async function main() {
     console.log("Iniciando Pyodide...");
 
-    // Inicializar Pyodide
-    let pyodide = await loadPyodide();
+    // Inicializar Pyodide com indexURL especificado
+    let pyodide = await loadPyodide({
+        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.18.1/full/"
+    });
     console.log("Pyodide carregado.");
 
     // Carregar bibliotecas necessárias
@@ -122,20 +124,20 @@ fig = go.Figure(data=traces, layout=layout)
 fig
 print("Gráfico criado.")
 `;
-    
+
     console.log("Executando código Python...");
-    
+
     // Executar o código Python
     await pyodide.runPythonAsync(pythonCode);
-    
+
     console.log("Código Python executado.");
-    
+
     // Obter o gráfico Plotly criado pelo código Python
     let fig = pyodide.globals.get('fig');
-    
+
     // Verificar se o gráfico foi obtido corretamente
     console.log(fig);
-    
+
     // Renderizar o gráfico na página
     Plotly.newPlot('graph', fig.data, fig.layout);
     console.log("Gráfico renderizado.");
