@@ -1,23 +1,30 @@
 async function main() {
     console.log("Iniciando Pyodide...");
 
-    // Inicializar Pyodide com indexURL especificado
     let pyodide = await loadPyodide({
         indexURL: "https://cdn.jsdelivr.net/pyodide/v0.21.3/full/"
     });
     console.log("Pyodide carregado.");
 
-    // Carregar bibliotecas necessárias
     await pyodide.loadPackage(["pandas", "numpy"]);
     console.log("Bibliotecas pandas e numpy carregadas.");
 
-    // Definir o código Python como uma string
-    const pythonCode = `
+    // Carregar o arquivo CSV usando PapaParse
+    Papa.parse("cotasRioNegro.csv", {
+        download: true,
+        header: true,
+        complete: async function(results) {
+            console.log("CSV carregado:", results.data);
+
+            // Converter os dados CSV para um DataFrame pandas
+            let csvData = JSON.stringify(results.data);
+            const pythonCode = `
 import pandas as pd
 import numpy as np
 
-# Ler o arquivo CSV em um DataFrame
-df = pd.read_csv('cotasRioNegro.csv')
+# Carregar os dados CSV a partir do JavaScript
+csv_data = '''${csvData}'''
+df = pd.read_json(csv_data)
 
 # Converter a coluna 'dias' para o formato datetime
 df['dias'] = pd.to_datetime(df['dias'])
@@ -61,86 +68,83 @@ df_pivot_json = df_pivot.to_json(orient='split')
 df_pivot_json
 `;
 
-    console.log("Executando código Python...");
+            console.log("Executando código Python...");
 
-    // Executar o código Python e obter os dados em formato JSON
-    let df_pivot_json = await pyodide.runPythonAsync(pythonCode);
+            let df_pivot_json = await pyodide.runPythonAsync(pythonCode);
 
-    console.log("Dados obtidos do Python:", df_pivot_json);
+            console.log("Dados obtidos do Python:", df_pivot_json);
 
-    // Converter JSON para objeto JavaScript
-    let df_pivot = JSON.parse(df_pivot_json);
+            let df_pivot = JSON.parse(df_pivot_json);
 
-    // Preparar dados para o Plotly
-    let traces = [];
+            let traces = [];
+            const LINE_THICKNESS = 2;
+            const FONT_SIZE = 18;
 
-    const LINE_THICKNESS = 2;
-    const FONT_SIZE = 18;
+            df_pivot.columns.slice(3).forEach((col, i) => {
+                let trace = {
+                    x: df_pivot.data.map(row => row[2]), // coluna 'data'
+                    y: df_pivot.data.map(row => row[3 + i]), // cada coluna de ano
+                    mode: 'lines',
+                    name: col,
+                    visible: 'legendonly',
+                    line: { width: LINE_THICKNESS },
+                    hovertemplate: '%{y}m'
+                };
+                traces.push(trace);
+            });
 
-    // Adicionar traces para cada coluna de ano
-    df_pivot.columns.slice(3).forEach((col, i) => {
-        let trace = {
-            x: df_pivot.data.map(row => row[2]), // coluna 'data'
-            y: df_pivot.data.map(row => row[3 + i]), // cada coluna de ano
-            mode: 'lines',
-            name: col,
-            visible: 'legendonly',
-            line: { width: LINE_THICKNESS },
-            hovertemplate: '%{y}m'
-        };
-        traces.push(trace);
+            let layout = {
+                paper_bgcolor: "white",
+                plot_bgcolor: "white",
+                title: 'Variação do Nível da Água do Rio Negro ao Longo do Ano',
+                title_x: 0.5,
+                xaxis: {
+                    title: "Época do Ano",
+                    gridcolor: 'lightgray',
+                    tickfont: { size: FONT_SIZE },
+                    titlefont: { size: FONT_SIZE },
+                    mirror: true,
+                    ticks: 'outside',
+                    tickformat: '%d %b',
+                    showline: true,
+                    linewidth: 1,
+                    linecolor: 'black',
+                    minor: {
+                        ticks: "inside",
+                        showgrid: true
+                    }
+                },
+                yaxis: {
+                    title: "Nível (m)",
+                    gridcolor: 'lightgray',
+                    tickfont: { size: FONT_SIZE },
+                    titlefont: { size: FONT_SIZE },
+                    mirror: true,
+                    ticks: 'outside',
+                    tickson: "boundaries",
+                    dtick: 1,
+                    showline: true,
+                    linewidth: 1,
+                    linecolor: 'black',
+                    minor: {
+                        ticks: "inside",
+                        showgrid: true
+                    }
+                },
+                font: { size: FONT_SIZE },
+                showlegend: true,
+                hovermode: 'x unified'
+            };
+
+            Plotly.newPlot('graph', traces, layout);
+            console.log("Gráfico renderizado.");
+        },
+        error: function(err) {
+            console.error("Erro ao carregar CSV:", err);
+        }
     });
-
-    // Layout do gráfico
-    let layout = {
-        paper_bgcolor: "white",
-        plot_bgcolor: "white",
-        title: 'Variação do Nível da Água do Rio Negro ao Longo do Ano',
-        title_x: 0.5,
-        xaxis: {
-            title: "Época do Ano",
-            gridcolor: 'lightgray',
-            tickfont: { size: FONT_SIZE },
-            titlefont: { size: FONT_SIZE },
-            mirror: true,
-            ticks: 'outside',
-            tickformat: '%d %b',
-            showline: true,
-            linewidth: 1,
-            linecolor: 'black',
-            minor: {
-                ticks: "inside",
-                showgrid: true
-            }
-        },
-        yaxis: {
-            title: "Nível (m)",
-            gridcolor: 'lightgray',
-            tickfont: { size: FONT_SIZE },
-            titlefont: { size: FONT_SIZE },
-            mirror: true,
-            ticks: 'outside',
-            tickson: "boundaries",
-            dtick: 1,
-            showline: true,
-            linewidth: 1,
-            linecolor: 'black',
-            minor: {
-                ticks: "inside",
-                showgrid: true
-            }
-        },
-        font: { size: FONT_SIZE },
-        showlegend: true,
-        hovermode: 'x unified'
-    };
-
-    // Renderizar o gráfico na página
-    Plotly.newPlot('graph', traces, layout);
-    console.log("Gráfico renderizado.");
 }
 
-// Executar a função principal
 main().catch((error) => {
     console.error("Erro durante a execução:", error);
 });
