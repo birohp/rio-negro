@@ -1,9 +1,13 @@
 async function main() {
+    console.log("Iniciando Pyodide...");
+
     // Inicializar Pyodide
     let pyodide = await loadPyodide();
-    
+    console.log("Pyodide carregado.");
+
     // Carregar bibliotecas necessárias
     await pyodide.loadPackage(["pandas", "numpy"]);
+    console.log("Bibliotecas pandas e numpy carregadas.");
 
     // Definir o código Python como uma string
     const pythonCode = `
@@ -11,8 +15,11 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
+print("Código Python iniciado.")
+
 # Ler o arquivo CSV em um DataFrame
 df = pd.read_csv('cotasRioNegro.csv')
+print("Arquivo CSV carregado.")
 
 # Converter a coluna 'dias' para o formato datetime
 df['dias'] = pd.to_datetime(df['dias'])
@@ -113,17 +120,28 @@ layout = go.Layout(
 # Criar a figura
 fig = go.Figure(data=traces, layout=layout)
 fig
+print("Gráfico criado.")
 `;
+    
+    console.log("Executando código Python...");
     
     // Executar o código Python
     await pyodide.runPythonAsync(pythonCode);
     
+    console.log("Código Python executado.");
+    
     // Obter o gráfico Plotly criado pelo código Python
     let fig = pyodide.globals.get('fig');
     
+    // Verificar se o gráfico foi obtido corretamente
+    console.log(fig);
+    
     // Renderizar o gráfico na página
     Plotly.newPlot('graph', fig.data, fig.layout);
+    console.log("Gráfico renderizado.");
 }
 
 // Executar a função principal
-main();
+main().catch((error) => {
+    console.error("Erro durante a execução:", error);
+});
